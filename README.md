@@ -1,4 +1,4 @@
-# AWS SageMaker Automatic Sentiment Analisys and Tagging of Text files put in an S3 Bucket
+# AWS SageMaker -  Sentiment Analisys Prediction of Text put in an S3 Bucket
 
 This project is just an example of how to use AWS SageMaker to make AI prediction.
 I used a free model/algorithm package available on AWS Sagemaker ( "knime-sentiment-model-package" ) to identify the sentiment (positive/negative) of a given text in English.
