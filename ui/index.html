@@ -1,0 +1,313 @@
+	
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>AWS SDK for JavaScript - Browser S3 API - Getting Started App.</title>
+    <link rel = "stylesheet" type = "text/css" href = "css/common.css" />
+  </head>
+
+  <body style="font-family: 'Roboto', sans-serif;" >
+    <div id="header" class="outline" style="background-color: #3498db;color: white; font-size: 30px;">&nbsp;<b>Reviews Text Sentiment Analisys</b> - AWS JS SDK Demo with S3 Bucket.</div>
+    <div id="main">
+      <div class="column outline">
+      <p id="result">Manage Bucket: <b><a target="_blank" href="https://s3.console.aws.amazon.com/s3/buckets/hcom-sentiment-predict-bucket/?region=us-east-2&tab=overview">hcom-sentiment-predict-bucket</a></b>
+      <div id="loading-image" style="display:none" ><img style="width:32px;height:32px;" src="img/loading.gif"></div></p>
+      <div id="bt_getfolders" class="column"><button class="butn" id="bt_start" onClick="listBucketTags(); listfolders();">Get Bucket Folders</button></div>
+      <div id="bt_back" class="column"><p>&nbsp;</p></div>
+      <div id="viewer"></div>
+      </div>
+      <div class="column outline">
+        <h3>Upload Review text</h3>
+        <hr>
+        <p>
+        <h4>Upload File:</h4>
+        <form name="uploadForm">
+          <input type="file" name="textupload" id="textupload" accept="text/plain" />
+          <input type="button" class="butn" value="Upload" onclick="addFile();">
+        </form>
+        </p>
+        <hr>
+        <p>
+        <h4>Upload Text:</h4>
+        <form name="uploadForm">
+          <textarea id="review_text" name="review_text" style="width: 100%; height: 200px;"form="uploadForm">Enter text here...</textarea><br>
+          <input type="button" class="butn" value="Upload" onclick="addTextasFile(document.getElementById('review_text').value);">
+        </form>
+        </p>
+        <div id="viewer2"></div>
+      </div>
+    </div>
+
+<script src="scripts/aws-sdk-2.283.1.min.js"></script>
+<script src="scripts/jquery-3.4.1.min.js"></script>
+<script>
+
+var bucketName = 'hcom-sentiment-predict-bucket';
+var bucketRegion = 'us-east-2';
+var IdentityPoolId = 'us-east-2:b7132b91-2955-437d-8db8-019070f35e32';
+
+// SET CREDENTIALS in CONFIG
+AWS.config.update({
+  region: bucketRegion,
+  credentials: new AWS.CognitoIdentityCredentials({
+    IdentityPoolId: IdentityPoolId
+  })
+});
+
+var s3 = new AWS.S3({
+  apiVersion: '2006-03-01',
+  params: {Bucket: bucketName, Delimiter: '/',
+  Prefix: 'reviews/'}
+});
+
+function viewFile(srckey) {
+  s3.getObject({
+        Bucket: bucketName,
+        Key: srckey
+    }, function(err, data) {
+        if (err) {
+            console.log(err, err.stack);
+        } else {
+            document.getElementById('content_'+ srckey).style.backgroundColor = "lightgrey";
+            document.getElementById('content_'+ srckey).style.color = "black";
+            document.getElementById('content_'+ srckey).innerHTML = '<p>' + data.Body.toString('ascii') + '</p>';
+        }
+    });
+}
+
+
+function listBucketTags() {
+    var params = {Bucket: bucketName};
+    s3.getBucketTagging(params, function(err, data) {
+      if (err) {
+        console.log(err, err.stack); // an error occurred
+      } else {
+          document.getElementById('viewer').innerHTML+='<hr><h4>Bucket Tags</h4><ul>';
+          for(var i = 0; i < data.TagSet.length; i++){
+            document.getElementById('viewer').innerHTML+='<li><span style="font-size:14px;font:color:grey"><b>'+data.TagSet[i].Key+'</b>='+data.TagSet[i].Value+'</li>';
+          }
+          document.getElementById('viewer').innerHTML+='</ul>';
+      }
+    });
+}
+
+function listFileTags(key, itemUrl) {
+    var params = {Bucket: bucketName, Key: key};
+    s3.getObjectTagging(params, function(err, data) {
+      if (err) {
+        console.log(err, err.stack); // an error occurred
+        return null;
+      
+      } else {
+        if (document.getElementById('tags_'+key)) {
+          
+          if (data.TagSet.length>0) {
+            var num = round(data.TagSet[0].Value,2);
+            document.getElementById('tags_'+key).innerHTML='<img style="width:32px;height:32px;vertical-align:middle;" src="' + itemUrl + '"/>&nbsp;' + round((num*100),2) + '%';
+          }
+          
+        } else {
+          return data.TagSet;
+        }
+      }
+    });
+}
+
+function round(num, decimals) {
+    var n = Math.pow(10, decimals);
+    return Math.round( (n * num).toFixed(decimals) )  / n;
+}
+
+
+// A utility function to create HTML.
+function getHtml(template) {
+  return template.join('\n');
+}
+
+function listfolders() {
+  s3.listObjects({}, function(err, data) {
+    if (err) {
+      return alert('There was an error listing your folders: ' + err.message);
+      
+    } else {      
+        document.getElementById("bt_start").style.backgroundColor = "green";
+        var folders = data.CommonPrefixes.map(function(commonPrefix) {
+        var prefix = commonPrefix.Prefix;
+        // var folderName = decodeURIComponent(prefix.replace('/', ''));
+        return getHtml([
+          '<li>',
+            '<a href="javascript:void(0)" onclick="viewfolder(\'' + prefix + '\')">',
+              prefix,
+            '</a>',
+          '</li>'
+        ]);
+      });
+        
+      var message = folders.length ?
+        getHtml([
+          '',
+        ]) :
+        '<p>You do not have any folders. Please Create folder.';
+      var htmlTemplate = [
+        '<h3>Folders:</h3>',
+        message,
+        '<ul>',
+          getHtml(folders),
+        '</ul>',
+      ];
+      document.getElementById('bt_back').innerHTML = '<p>&nbsp;</p>';
+      document.getElementById('viewer').innerHTML = getHtml(htmlTemplate);
+    }
+  });
+}
+
+function removeFile(key, folder) {
+if (confirm('Are you sure you want to remove the file?')) {
+    // Save it!
+    var params = {  Bucket: bucketName, Key: key };
+      s3.deleteObject(params, function(err, data) {
+        if (err) console.log(err, err.stack);  // error
+        else {
+          alert("File successfully removed! ("+key+")");
+          viewfolder(folder);
+        }
+      });
+   }
+}
+
+// Show the items that exist in an folder.
+function viewfolder(folderName) {
+
+  var folderitemsKey = folderName; // encodeURIComponent(folderName) + '/';
+  
+  s3.listObjects({Prefix: folderitemsKey, Delimiter: '/'}, function(err, data) {
+    if (err) {
+      return alert('There was an error viewing your folder: ' + err.message);
+    }
+    // 'this' references the AWS.Response instance that represents the response
+    //var href = this.request.httpRequest.endpoint.href;
+    //var bucketUrl = href + folderName;
+
+    var items = data.Contents.map(function(item) {
+      if (item.Key!=folderitemsKey) {
+
+        var itemKey = item.Key;
+        
+        var tags = null;
+        var img = folderitemsKey.replace('reviews/','');
+        img = img.replace('/','');
+        
+        var itemUrl = "img/"+  img +".png"; //bucketUrl + encodeURIComponent(itemKey);
+        
+        tags = listFileTags(itemKey, itemUrl);
+        
+        
+          return getHtml([
+          '<span>',
+            '<div class="column3" >',
+              '<a href="javascript:void(0)" style="cursor:pointer;" title="Click to view the file content" onclick="viewFile(\'' + itemKey + '\')">',
+                itemKey.replace(folderitemsKey, ''),
+              '</a>',
+              '<img src="/img/trash.png" style="cursor:pointer;height:16px;width:16px;" title="Click to DELETE the file " onclick="removeFile(\'' + itemKey + '\',\''+folderitemsKey+'\');" >','</img>',
+              '<div class="bolder" id="tags_'+itemKey+'">',
+              '</div>',
+              '<div id="content_'+itemKey+'" class="boxfile" style="cursor:pointer;" title="Click to view the file content" onclick="viewFile(\'' + itemKey + '\')">Click the link above to get the Review text','</div>',
+            '</div>',
+          '</span>',
+        ]);  
+        
+      } else { return getHtml(['']); }
+    });
+
+      var htmlTemplatebutton = ['<button class="butn" onclick="listfolders();">',
+          'Back To folders',
+        '</button>'];
+      document.getElementById('bt_back').innerHTML = getHtml(htmlTemplatebutton);
+      
+    var htmlTemplate = [
+      '<h3>',
+        'Folder: <b>' + folderName,
+      '</b></h3>',
+      //message,
+      '<div>',
+        getHtml(items),
+      '</div>'
+    ];
+    document.getElementById('viewer').innerHTML = getHtml(htmlTemplate);
+  });
+}
+
+function getRandomInt(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function addTextasFile(text) {
+  var random = getRandomInt(1,1000);
+  var fileName = "text" + random + ".txt";
+
+  var file = new File([text], fileName, {type: "text/plain", lastModified: Date.now()});
+  
+  saveFile(file);
+}
+
+function addFile() {
+
+  var files = document.getElementById('textupload').files;
+  
+  if (!files.length) {
+    return alert('Please choose a file to upload first.');
+  }
+  console.log(files);
+  console.log(files[0]);
+  var file = files[0];
+  
+  saveFile(file);
+  
+}
+  
+  
+  function saveFile(file) {
+    var fileName = file.name;
+    var reviewsKey = encodeURIComponent('reviews') + '/';
+    var textKey = reviewsKey + fileName;
+  
+    var params = {
+                Key: textKey,
+                ContentType: file.type,
+                Body: file,
+                ACL: 'public-read'
+            };
+  
+              s3.upload(params, function(err, data) {
+                if (err) {
+                    results.innerHTML = 'ERROR: ' + err;
+                } else {
+                    alert('Successfully uploaded file.');
+                    console.log(textKey);
+                    var params = {Bucket: bucketName, Key: textKey};
+                    
+                    s3.getObjectTagging(params, function(err, data) {
+                      if (err) {
+                        console.log(err, err.stack); // an error occurred
+                        return null;
+                      
+                      } else {
+                          var msg='Tags: ';
+                          for(var i = 0; i < data.TagSet.length; i++){
+                            msg+=data.TagSet[i].Key+'=<b>'+(i==0?(data.TagSet[i].Value*100)+'%':data.TagSet[i].Value)+"</b> \n ";
+                          }
+                          document.getElementById('viewer2').innerHTML='Successfully uploaded file (<b>'+textKey+'</b>)<br>'+ msg;
+                        }
+                    });
+                }
+            });
+  }
+  
+
+</script>
+
+</body>
+</html>
