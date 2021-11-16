@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "aws-sdk": "^2.487.0",
+    "aws-sdk": "^2.814.0",
     "express": "^4.17.1",
     "fs": "0.0.1-security",
     "require": "^2.4.20",
